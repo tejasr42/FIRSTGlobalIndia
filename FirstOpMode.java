@@ -22,25 +22,38 @@ public class FirstOpMode extends LinearOpMode {
         rightfront = hardwareMap.dcMotor.get("right_front");
         leftback = hardwareMap.dcMotor.get("left_back");
         rightback = hardwareMap.dcMotor.get("right_back");
-        
+        collector=hardwareMap.dcMotor.get("collector");
+        lift=hardwareMap.dcMotor.get("lift");
+        sorter=hardwareMap.servo.get("sorter");
+        colorsort=hardwareMap.colorSensor.get("color");
 
+        resetComponents();
+
+        waitForStart();
+        while(opModeIsActive()){
+            leftfront.setPower(-gamepad1.left_stick_y);
+            rightfront.setPower(-gamepad1.rightt_stick_y);
+            leftback.setPower(-gamepad1.left_stick_y);
+            rightback.setPower(-gamepad1.right_stick_y);
+            collector.setPower(gamepad1.left_trigger);
+            lift.setPower(gamepad1.right_trigger);
+
+            sorter.setPosition(gamepad2.left_stick_y);
+
+            boolean is = waitForTick(40);
+            if(!is) return;
+        }
+        resetComponents();
+
+    }
+    private void resetComponents(){
         leftfront.setPower(0);
         rightfront.setPower(0);
         leftback.setPower(0);
         rightback.setPower(0);
-
-        waitForStart();
-        while(opModeIsActive()){
-            left_motor.setPower(-gamepad1.right_stick_y);
-            right_motor.setPower(-gamepad1.left_stick_y);
-            boolean is = waitForTick(40);
-            if(!is) return;
-        }
-        left_motor.setPower(0);
-        right_motor.setPower(0);
-
+        collector.setPower(0);
+        lift.setPower(0);
     }
-
     private boolean waitForTick(long periodMs){
         try{
             long remaining = periodMs - (long)period.milliseconds();
