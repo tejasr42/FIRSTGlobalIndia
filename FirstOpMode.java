@@ -69,9 +69,9 @@ public class FirstOpMode extends LinearOpMode {
                 sorter.setPosition(0.6);
             }
             //sorter.setPosition(0.5+0.36*gamepad2.left_stick_y);
-            /*telemetry.addData("prox",prox.getDistance(DistanceUnit.CM));
+            telemetry.addData("prox",prox.getDistance(DistanceUnit.CM));
             telemetry.addData("color",colorsort.blue());
-            telemetry.update();*/
+            telemetry.update();
             boolean is = waitForTick(40);
             if(!is) return;
         }
