@@ -10,6 +10,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.internal.SystemProperties;
 
 import java.util.Comparator;
 import java.util.PriorityQueue;
@@ -42,23 +43,26 @@ public class FirstOpMode extends LinearOpMode {
 
     private DcMotor leftfront, rightfront, leftback, rightback, collector, lift, climbleft, climbright;
     private Servo[] sorter = new Servo[3];
+    private Servo deliver;
     private ColorSensor[] color = new ColorSensor[3];
     private DistanceSensor[] prox = new DistanceSensor[3];
     private boolean[] orange = new boolean[3],blue = new boolean[3];
-    private double[][] endp = new double[][]{{0.1, 0.23, 0.4}, {0.2, 0.35, 0.5}, {0.4, 0.23, 0.1}};
+    //{{0.1, 0.23, 0.4}, {0.2, 0.35, 0.5}, {0.4, 0.23, 0.1}}
+    private double[][] endp = new double[][]{{0.15, 0.15, 0.4}, {0.2, 0.2, 0.5}, {0.35, 0.35, 0.1}};
     private long lastNotDetected[] = new long[3];
-    private int balldelay=800;
-    private double left,right,sig;
+    private int balldelay=800,des=0,cur=0,enc=20;
+    private double velRight=0,velLeft=0,accer,accel,del=0;
     private ElapsedTime period = new ElapsedTime();
-
+    private boolean scalelock=false,last=false,lasta=false,lastb=false;
     public void runOpMode(){
         robotInit();
         while(opModeIsActive()){
-            tankDrive();
-            //drive();
+            //tankDrive();
+            accelDrive();
             sortBalls();
             telemetry();
             scale();
+            deliver();
             if(!waitForTick(10)) return;
         }
         resetComponents();
@@ -80,14 +84,21 @@ public class FirstOpMode extends LinearOpMode {
             prox[i] = (DistanceSensor)hardwareMap.get("color"+((Integer)i).toString());
             queue[i]= new PriorityQueue<Action>(10,comp);
         }
+        deliver = hardwareMap.servo.get("deliver");
         leftfront.setDirection(DcMotorSimple.Direction.REVERSE);
         leftback.setDirection(DcMotorSimple.Direction.REVERSE);
         climbleft = hardwareMap.dcMotor.get("climb_left");
         climbright = hardwareMap.dcMotor.get("climb_right");
         climbleft.setDirection(DcMotorSimple.Direction.REVERSE);
+        climbleft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        climbright.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         resetComponents();
-        waitForStart();
+        collector.setPower(0.9);
+        lift.setPower(0.9);
+        lights();
+        color[0].enableLed(false);
     }
+
 
     private void tankDrive(){
         double leftJoy = -gamepad1.left_stick_y;
@@ -109,8 +120,47 @@ public class FirstOpMode extends LinearOpMode {
         rightback.setPower(mult*rightJoy);
         rightfront.setPower(mult*rightJoy);
     }
+    private void accelDrive(){
 
-    private void arcade(){
+        accer = -gamepad1.right_stick_y;
+        if(accer==0) accer=-0.9*velRight;
+        boolean brakeR = gamepad1.right_bumper;
+        if (Math.signum(velRight)==0) {
+            velRight+=accer*0.1;
+        }
+        else if(brakeR){
+            //velRight += Math.signum(velRight)*-0.1;
+            velRight=0;
+
+        }else if(Math.signum(velRight) == Math.signum(accer)){
+            velRight += accer*Math.max(0.3,velRight);
+        }else{
+            velRight += accer*0.5;
+        }
+        velRight=Math.min(1,velRight);
+        rightfront.setPower(velRight);
+        rightback.setPower(velRight);
+
+        accel = -gamepad1.left_stick_y;
+        if(accel==0) accel=-0.9*velLeft;
+        boolean brakeL = gamepad1.left_bumper;
+        if (Math.signum(velLeft)==0) {
+            velLeft+=accel*0.1;
+        }
+        else if(brakeL){
+            //velLeft += Math.signum(velLeft)*-0.1;
+            velLeft=0;
+        }else if(Math.signum(velLeft) == Math.signum(accel)){
+            velLeft += accel*Math.max(0.3,velLeft);
+        }else{
+            velLeft += (accel)*0.5;
+        }
+        velLeft=Math.min(1,velLeft);
+        leftfront.setPower(velLeft);
+        leftback.setPower(velLeft);
+    }
+
+    /*private void arcade(){
         left=-Math.pow(gamepad1.right_trigger,3)*Math.max(1,27*Math.pow(gamepad1.left_stick_y,3));
         right=Math.pow(-gamepad1.right_trigger,3);
         sig=Math.signum(gamepad1.left_stick_y);
@@ -123,37 +173,94 @@ public class FirstOpMode extends LinearOpMode {
             left /= Math.max(Math.abs(left),Math.abs(right));
             right /= Math.max(Math.abs(left),Math.abs(right));
         }
-    }
+    }*/
 
     private void scale(){
-        boolean up = gamepad1.dpad_up;
-        boolean down = gamepad1.dpad_down;
+        telemetry.addData("scale",scalelock);
+        boolean up = gamepad2.dpad_up;
+        boolean down = gamepad2.dpad_down;
 
         if(down){
+            if(climbleft.getCurrentPosition()>climbright.getCurrentPosition()){
+                climbleft.setPower(1);
+            }
+            else{
+                climbleft.setPower(0);
+            }
 
-            climbleft.setPower(1);
-            climbright.setPower(1);
+            if(climbright.getCurrentPosition()>climbleft.getCurrentPosition()) {
+                climbright.setPower(1);
+            }
+            else{
+                climbright.setPower(0);
+            }
+
         }else if(up){
-            climbleft.setPower(-0.5);
-            climbright.setPower(-0.5);
+            if(climbleft.getCurrentPosition()<630 && climbleft.getCurrentPosition()<=climbright.getCurrentPosition()) {
+                climbleft.setPower(-0.8);
+            }
+            else {
+                climbleft.setPower(0);
+            }
+            if(climbright.getCurrentPosition()<=climbleft.getCurrentPosition()) {
+                climbright.setPower(-0.8);
+            }
+            else{
+                climbleft.setPower(0);
+            }
+
         }else{
             climbleft.setPower(0);
             climbright.setPower(0);
         }
 
+        if(last==false && gamepad2.dpad_left) {
+            if (scalelock) {
+                scalelock = false;
+                climbleft.setPower(0);
+                climbright.setPower(0);
+            }
+            if (!scalelock) {
+                scalelock = true;
+                climbleft.setPower(0.2);
+                climbright.setPower(0.2);
+            }
+        }
+        last=gamepad2.dpad_left;
     }
-    private void drive(){
+    /*private void drive(){
         leftfront.setPower(left);
         rightfront.setPower(right);
         leftback.setPower(left);
         rightback.setPower(right);
-    }
+    }*/
+    private void deliver(){
+        if(gamepad2.a) {
+            des=enc;
+        }
+        else if(gamepad2.b){
+            des=-enc;
+        }
+        else {
+            des=0;
+        }
+        deliver.setPosition(0.5+Math.signum(des-cur)*0.2);
+        cur+=Math.signum(des-cur)*1;
+        telemetry.addData("des",des);
 
-    long lastTime = System.currentTimeMillis();
+        lastb=gamepad2.b;
+    }
     private void sortBalls(){
         sorting(0);sorting(1);sorting(2);
     }
-
+    private void lights(){
+        while(!isStarted()){
+            for(int i=0;i<3;i++) {
+                color[i].enableLed(Math.random() > 0.5);
+                waitForTick(100);
+            }
+        }
+    }
     private void telemetry(){
         telemetry.update();
 
@@ -171,11 +278,11 @@ public class FirstOpMode extends LinearOpMode {
         if (!orange[col] && prox[col].getDistance(DistanceUnit.CM) < 6 && color[col].blue() < color[col].red()) {
             orange[col] = true;
             lastNotDetected[col] = System.currentTimeMillis();
-            queue[col].add(new Action(800 + System.currentTimeMillis(), 1));
+            queue[col].add(new Action(800 + System.currentTimeMillis(), -1));
         } else if (!blue[col] && prox[col].getDistance(DistanceUnit.CM) < 6 && color[col].blue() > color[col].red()) {
             blue[col] = true;
             lastNotDetected[col] = System.currentTimeMillis();
-            queue[col].add(new Action(800 + System.currentTimeMillis(), -1));
+            queue[col].add(new Action(800 + System.currentTimeMillis(), 1));
         }
         if (orange[col] && (prox[col].getDistance(DistanceUnit.CM) > 6 || System.currentTimeMillis() - lastNotDetected[col] > balldelay)) {
             orange[col] = false;

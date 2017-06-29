@@ -19,10 +19,10 @@ import java.util.Queue;
  * Created by tejas on 24-06-2017.
  */
 
-/*
-@TeleOp(name = "Test101", group = "Practice Mode")
-public class FirstOpMode extends LinearOpMode {
 
+@TeleOp(name = "Test101", group = "Practice Mode")
+public class SecondOpMode extends LinearOpMode {
+/*
     private DcMotor collector, lift;
     private Servo sorter;
     private ColorSensor colorsort;
@@ -129,17 +129,100 @@ public class FirstOpMode extends LinearOpMode {
             }
         }
     }
-    private boolean waitForTick(long periodMs){
-        try{
-            long remaining = periodMs - (long)period.milliseconds();
-            if(remaining > 0){
-                Thread.sleep(remaining);
-            }
-            period.reset();
-        }catch(java.lang.InterruptedException exc){
-            return false;
-        }
-        return true;
+    */
+private DcMotor rf,rb,lf,lb;
+private double left,right,sig;
+    private double velRight = 0, velLeft = 0,accel,accer;
+    ElapsedTime period = new ElapsedTime();
+    public void runOpMode(){
+    robotInit();
+    while(opModeIsActive()){
+        //arcade();
+        //tankDrive();
+        //drive();
+        //sortBalls();
+
+        telemetry.addData("aleft",accel);
+        telemetry.addData("aright",accer);
+        telemetry.addData("left",velLeft);
+        telemetry.addData("right",velRight);
+        telemetry.update();
+        drive();
+        //scale();
+
+        if(!waitForTick(40)) return;
     }
+    resetComponents();
+
 }
-*/
+    private void resetComponents(){
+        rf.setPower(0);
+        rb.setPower(0);
+        lf.setPower(0);
+        lb.setPower(0);
+
+    }
+    private void robotInit(){
+        rf=hardwareMap.dcMotor.get("rf");
+        rb=hardwareMap.dcMotor.get("rb");
+        lf=hardwareMap.dcMotor.get("lf");
+        lb=hardwareMap.dcMotor.get("lb");
+        lf.setDirection(DcMotorSimple.Direction.REVERSE);
+        lb.setDirection(DcMotorSimple.Direction.REVERSE);
+
+
+//        rf.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        rb.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        lf.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        lb.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        resetComponents();
+        waitForStart();
+    }
+
+    private boolean waitForTick(long periodMs){
+    try{
+        long remaining = periodMs - (long)period.milliseconds();
+        if(remaining > 0){
+            Thread.sleep(remaining);
+        }
+        period.reset();
+    }catch(java.lang.InterruptedException exc){
+        return false;
+    }
+    return true;
+    }
+    private void arcade(){
+        double y=-gamepad1.left_stick_y;
+        left=Math.signum(y)*Math.pow((Math.max(Math.abs(y),0.2)-0.2)*1.25,5);
+        right=left;
+        if(left==0) {
+            left=Math.pow(gamepad1.left_stick_x,3);
+            right=-left;
+        }
+        else {
+            left*=1+(0.2*gamepad1.left_stick_x);
+            right/=1+(0.2*gamepad1.left_stick_x);
+        }
+        left*=1-Math.pow(gamepad1.right_trigger,2);
+        right*=1-Math.pow(gamepad1.right_trigger,2);
+        double maxlr=Math.max(Math.abs(left),Math.abs(right));
+        if(maxlr>1) {
+            left /= maxlr;
+            right /= maxlr;
+        }
+        if(gamepad1.dpad_up) {left=0.1;right=0.1;}
+    }
+
+    private void accelDrive(){
+
+    }
+
+
+    private void drive(){
+        rb.setPower(gamepad1.right_stick_y);
+        rf.setPower(gamepad1.right_stick_y);
+        lb.setPower(gamepad1.left_stick_y);
+        lf.setPower(gamepad1.left_stick_y);
+    }
+
+}
