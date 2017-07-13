@@ -15,7 +15,7 @@ import org.firstinspires.ftc.robotcore.internal.SystemProperties;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 
-@TeleOp(name = "Normal", group = "Practice Mode")
+@TeleOp(name = "Accel", group = "Practice Mode")
 public class FirstOpMode extends LinearOpMode {
     public class Action {
         long time;
@@ -37,9 +37,7 @@ public class FirstOpMode extends LinearOpMode {
             if (a.time > b.time) return 1;
             else if (a.time == b.time) return 0;
             else return -1;
-
         }
-
     }
 
     PriorityQueue<Action>[] queue = new PriorityQueue[3];
@@ -51,7 +49,7 @@ public class FirstOpMode extends LinearOpMode {
     private DistanceSensor[] prox = new DistanceSensor[3];
     private boolean[] orange = new boolean[3], blue = new boolean[3];
     //{{0.1, 0.23, 0.4}, {0.2, 0.35, 0.5}, {0.4, 0.23, 0.1}}
-    private double[][] endp = new double[][]{{0.15, 0.15, 0.4}, {0.2, 0.2, 0.5}, {0.35, 0.35, 0.1}};
+    private double[][] endp = new double[][]{{0.15, 0.15, 0.4, 0.05}, {0.15, 0.15, 0.5,0.01}, {0.35, 0.35, 0.1,0.45}};
     private long lastNotDetected[] = new long[3];
     private int balldelay = 800, des = 0, cur = 0, enc = 6;
     private double velRight = 0, velLeft = 0, accer, accel, del = 0;
@@ -62,15 +60,14 @@ public class FirstOpMode extends LinearOpMode {
         robotInit();
         while (opModeIsActive()) {
             tankDrive();
-            //accelDrive();
             collect();
             if(sort){
                 sortBalls();
             }
             telemetry();
-            scale2();
+            scale3();
             deliver();
-            if (!waitForTick(10)) return;
+            if (!waitForTick(20)) return;
         }
         resetComponents();
 
@@ -97,7 +94,8 @@ public class FirstOpMode extends LinearOpMode {
         leftback.setDirection(DcMotorSimple.Direction.REVERSE);
         climbleft = hardwareMap.dcMotor.get("climb_left");
         climbright = hardwareMap.dcMotor.get("climb_right");
-        climbleft.setDirection(DcMotorSimple.Direction.REVERSE);
+        climbright.setDirection(DcMotorSimple.Direction.REVERSE);
+        climbright.setDirection(DcMotorSimple.Direction.REVERSE);
         climbleft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         climbright.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         climbleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -109,7 +107,47 @@ public class FirstOpMode extends LinearOpMode {
     }
 
 
-    private void tankDrive() {
+    private void move(double left, double right){
+        leftback.setPower(left);
+        leftfront.setPower(left);
+        rightback.setPower(right);
+        rightfront.setPower(right);
+    }
+
+    private void tankDrive(){
+        boolean rightTrig = gamepad1.right_trigger > 0;
+        boolean leftTrig = gamepad1.left_trigger > 0;
+        boolean rightBum = gamepad1.right_bumper;
+        boolean leftBum = gamepad1.left_bumper;
+        double rightMult, leftMult;
+        if(gamepad2.dpad_right){
+            rightMult=0.3;
+            leftMult=0.3;
+        }
+        else if(rightTrig && leftTrig) {
+            rightMult = 0.9;
+            leftMult =0.9;
+        }
+        else if(leftTrig) {
+            rightMult = 0.2;
+            leftMult =0.9;
+        }
+        else if(rightTrig){
+            rightMult = 0.9;
+            leftMult =0.2;
+        }
+        else {
+            rightMult = 0.6;
+            leftMult=0.6;
+        }
+
+        if(rightBum && leftBum) move(-gamepad1.left_stick_y*0.3, -gamepad1.right_stick_y*0.3);
+        else if(leftBum) move(-0.3, -0.3);
+        else if(rightBum) move(0.3, 0.3);
+        else move(-gamepad1.left_stick_y*leftMult, -gamepad1.right_stick_y*rightMult);
+    }
+
+    private void tankDrive2() {
         double leftJoy = -gamepad1.left_stick_y;
         double rightJoy = -gamepad1.right_stick_y;
         boolean rightTrigger = gamepad1.right_trigger > 0;
@@ -124,10 +162,22 @@ public class FirstOpMode extends LinearOpMode {
         } else {
             mult = 0.7;
         }
-        leftback.setPower(mult * leftJoy);
-        leftfront.setPower(mult * leftJoy);
-        rightback.setPower(mult * rightJoy);
-        rightfront.setPower(mult * rightJoy);
+        if(gamepad1.right_bumper){
+            leftback.setPower(mult);
+            leftfront.setPower(mult);
+            rightback.setPower(mult);
+            rightfront.setPower(mult);
+        }else if(gamepad1.left_bumper){
+            leftback.setPower(-mult);
+            leftfront.setPower(-mult);
+            rightback.setPower(-mult);
+            rightfront.setPower(-mult);
+        }else{
+            leftback.setPower(mult * leftJoy);
+            leftfront.setPower(mult * leftJoy);
+            rightback.setPower(mult * rightJoy);
+            rightfront.setPower(mult * rightJoy);
+        }
     }
     private void collect(){
         if(gamepad2.x){
@@ -140,47 +190,41 @@ public class FirstOpMode extends LinearOpMode {
             orb=false;
         }
         if(orbt){
-            lift.setPower(0.7);
+            lift.setPower(1);
             collector.setPower(0.8);
         }
         else{
-
             lift.setPower(0);
             collector.setPower(0);
         }
         if(gamepad2.y){
             collector.setPower(-0.9);
-            lift.setPower(0);
+            lift.setPower(-0.7);
         }
-        if(gamepad2.dpad_up) {
+        if(gamepad2.dpad_left) {
             sort=true;
-            if(queue[0].isEmpty() && queue[1].isEmpty() &&  queue[2].isEmpty()) {
-                for (int j = 0; j < 3; j++) sorter[j].setPosition(endp[j][0]);
-            }
+            for (int j = 0; j < 3; j++) sorter[j].setPosition(endp[j][0]);
         }else if(gamepad2.dpad_down){
-            if(queue[0].isEmpty() && queue[1].isEmpty() &&  queue[2].isEmpty()) {
-                sort = false;
-                for (int j = 0; j < 3; j++) sorter[j].setPosition(endp[j][2]);
-            }
+            sort = false;
+            for (int j = 0; j < 3; j++) sorter[j].setPosition(endp[j][2]);
+        }else if(gamepad2.dpad_up){
+            sort = false;
+            for (int j = 0; j < 3; j++) sorter[j].setPosition(endp[j][3]);
         }
     }
     private void accelDrive() {
-
         accer = -gamepad1.right_stick_y;
         if (accer == 0) accer = -0.9 * velRight;
         boolean brakeR = gamepad1.right_bumper;
         if (Math.signum(velRight) == 0) {
             velRight += accer * 0.1;
         } else if (brakeR) {
-            //velRight += Math.signum(velRight)*-0.1;
             velRight = 0;
-
         } else if (Math.signum(velRight) == Math.signum(accer)) {
             velRight += accer * Math.max(0.3, Math.abs(velRight));
         } else {
             velRight += accer * 0.5;
         }
-
 
         accel = -gamepad1.left_stick_y;
         if (accel == 0) accel = -0.9 * velLeft;
@@ -289,25 +333,97 @@ public class FirstOpMode extends LinearOpMode {
         leftback.setPower(left);
         rightback.setPower(right);
     }*/
+    boolean lastr=false,lastl=false;
+    int errorl=0,errorr=0;
 
-    private void scale2(){
+    private void scale3(){
+        int lenc=climbleft.getCurrentPosition();
+        int renc=climbright.getCurrentPosition();
 
-        if(gamepad2.right_trigger > 0 && climbright.getCurrentPosition()>-610){
-            climbright.setPower(-gamepad2.right_trigger);
-        }else if(gamepad2.right_bumper && climbright.getCurrentPosition()<-5){
-            climbright.setPower(0.8);
+        if(gamepad2.left_stick_y != 0){
+            climbright.setPower(-gamepad2.left_stick_y);
+        }else if(gamepad2.right_bumper && renc < 620){
+            climbright.setPower(0.5);
+        }else if(gamepad2.right_trigger > 0 && renc > 0){
+            climbright.setPower(-0.9);
         }else{
             climbright.setPower(0);
         }
-        if(gamepad2.left_trigger > 0 && climbleft.getCurrentPosition()>-620){
-                climbleft.setPower(-gamepad2.left_trigger);
-        }else if(gamepad2.left_bumper && climbleft.getCurrentPosition()<-5){
-                climbleft.setPower(0.8);
-            }else {
+        if(gamepad2.left_stick_y != 0){
+            climbleft.setPower(-gamepad2.left_stick_y);
+        }else if(gamepad2.left_bumper && lenc <620){
+            climbleft.setPower(0.5);
+        }else if(gamepad2.left_trigger > 0 && lenc > 0){
+            climbleft.setPower(-0.9);
+        }else{
+            climbleft.setPower(0);
+        }
+    }
+
+    private void scale2(){
+        int lenc=climbleft.getCurrentPosition();
+        int renc=climbright.getCurrentPosition();
+        telemetry.addData("r",errorr);
+        telemetry.addData("l",errorl);
+
+        if(gamepad2.right_bumper){
+            if(renc+errorr<620){
+                climbright.setPower(0.5);
+            }
+            else{
+                climbright.setPower(0);
+            }
+            if(lenc+errorl<620){
+                climbleft.setPower(0.5);
+            }
+            else{
                 climbleft.setPower(0);
             }
+        }else if(gamepad2.left_bumper){
+            if(renc+errorr>5){
+                climbright.setPower(-0.8);
+            }
+            else{
+                climbright.setPower(0);
+            }
+            if(lenc+errorl>5){
+                climbleft.setPower(-0.8);
+            }
+            else{
+                climbleft.setPower(0);
+            }
+        }else if (gamepad2.right_trigger > 0.5) {
+            lastr = true;
+            lastl = false;
+            climbleft.setPower(gamepad2.right_trigger);
+            climbright.setPower(gamepad2.right_trigger);
 
+        } else if (gamepad2.left_trigger > 0.5) {
+            lastl = true;
+            lastr = false;
+            climbleft.setPower(-1);
+            climbright.setPower(-1);
+        } else {
+            climbleft.setPower(0);
+            climbright.setPower(0);
+            if (lastl) {
+                climbleft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                climbleft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+                climbright.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                climbright.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+                errorl = 0;
+                errorr = 0;
+            }
+            if (lastr) {
+                telemetry.addData("lastrt","yes");
+                errorl = 620-climbleft.getCurrentPosition();
+                errorr = 620-climbright.getCurrentPosition();
+            }
+            lastr = false;
+            lastl = false;
+        }
     }
+
 
     long tick = 0;
     private void deliver() {
@@ -323,38 +439,18 @@ public class FirstOpMode extends LinearOpMode {
         }
         deliver.setPosition(0.5 + Math.signum(des - cur) * 0.2);
         cur += Math.signum(des - cur) * 1;
-        //telemetry.addData("des", des);
-        telemetry.addData("curPos of Servo: ", deliver.getPosition());
         lastb = gamepad2.b;
         if(des-cur==0){
-            if(gamepad2.right_stick_y>0.5) deliver.setPosition(0.4);
-            else if(gamepad2.right_stick_y<-0.5) deliver.setPosition(0.6);
+            deliver.setPosition(gamepad2.right_stick_x*0.5 + 0.5);
+            //if(gamepad2.right_stick_y>0.5) deliver.setPosition(0.3);
+            //else if(gamepad2.right_stick_y<-0.5) deliver.setPosition(0.7);
         }
 
 
     }
-
-//    private void delivery2() {
-//        if(gamepad2.a){
-//            deliver.setPosition(0.5 + Math.signum());
-//        }else if(gamepad2.b){
-//
-//        }else{
-//
-//        }
-//
-//    }
 
     private void sortBalls(){
         sorting(0);sorting(1);sorting(2);
-    }
-    private void lights(){
-        while(!isStarted()){
-            for(int i=0;i<3;i++) {
-                color[i].enableLed(Math.random() > 0.5);
-                waitForTick(100);
-            }
-        }
     }
     private void telemetry(){
         telemetry.update();
@@ -370,11 +466,12 @@ public class FirstOpMode extends LinearOpMode {
         for(int i = 0; i < 3; i++) sorter[i].setPosition(endp[i][1]);
     }
     private void sorting(int col){
+        telemetry.addData(col+"",prox[col].getDistance(DistanceUnit.CM));
         if (!orange[col] && prox[col].getDistance(DistanceUnit.CM) < 6 && color[col].blue() < color[col].red()) {
             orange[col] = true;
             lastNotDetected[col] = System.currentTimeMillis();
             queue[col].add(new Action(800 + System.currentTimeMillis(), -1));
-        } else if (!blue[col] && prox[col].getDistance(DistanceUnit.CM) < 6 && color[col].blue() > color[col].red()) {
+        } else if (!blue[col] && prox[col].getDistance(DistanceUnit.CM) < 6 && (color[col].blue() > color[col].red())){
             blue[col] = true;
             lastNotDetected[col] = System.currentTimeMillis();
             queue[col].add(new Action(800 + System.currentTimeMillis(), 1));
