@@ -16,8 +16,8 @@ import org.firstinspires.ftc.robotcore.internal.SystemProperties;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 
-@TeleOp(name = "Accel", group = "Practice Mode")
-public class FirstOpMode extends LinearOpMode {
+@TeleOp(name = "AccSort", group = "Practice Mode")
+public class SecondOpMode extends LinearOpMode {
     public class Action {
         long time;
         int action;
@@ -52,10 +52,10 @@ public class FirstOpMode extends LinearOpMode {
     //{{0.1, 0.23, 0.4}, {0.2, 0.35, 0.5}, {0.4, 0.23, 0.1}}
     private double[][] endp = new double[][]{{0.15, 0.15, 0.37, 0.03}, {0.18, 0.18, 0.4,0.07}, {0.32, 0.32, 0.1,0.45}};
     private long lastNotDetected[] = new long[3];
-    private int balldelay = 800, des = 0, cur = 0, enc = 6,lastpos=0;
+    private int balldelay = 800, des = 0, cur = 0, enc = 6,lastpos=0,vibcount=0;
     private double velRight = 0, velLeft = 0, accer, accel, del = 0;
     private ElapsedTime period = new ElapsedTime();
-    private boolean scalelock = false, last = false, lasta = false, lastb = false, orb=false,orbt=true,sort=true;
+    private boolean vibrate=false,scalelock = false, last = false, lasta = false, lastb = false, orb=false,orbt=true,sort=true;
 
     public void runOpMode() {
         robotInit();
@@ -65,10 +65,10 @@ public class FirstOpMode extends LinearOpMode {
             if(sort){
                 sortBalls();
             }
-            telemetry();
+            //telemetry();
             scale3();
             deliver();
-            if (!waitForTick(40)) return;
+            if (!waitForTick(20)) return;
         }
         resetComponents();
 
@@ -121,6 +121,8 @@ public class FirstOpMode extends LinearOpMode {
         boolean leftTrig = gamepad1.left_trigger > 0;
         boolean rightBum = gamepad1.right_bumper;
         boolean leftBum = gamepad1.left_bumper;
+        double rightst=gamepad1.right_stick_y;
+        double leftst=gamepad1.left_stick_y;
         double rightMult, leftMult;
         if(gamepad2.dpad_left){
             rightMult=0.3;
@@ -142,13 +144,32 @@ public class FirstOpMode extends LinearOpMode {
             rightMult = 0.6;
             leftMult=0.6;
         }
+        if(rightBum) vibrate=true;
+        else if(leftBum) {
+            vibcount=0;
+            vibrate=false;
+        }
 
-        if(rightBum && leftBum) move(-gamepad1.left_stick_y*0.3, -gamepad1.right_stick_y*0.3);
-        else if(leftBum) move(-0.3, -0.3);
-        else if(rightBum) move(0.3, 0.3);
-        else move(-gamepad1.left_stick_y*leftMult, -gamepad1.right_stick_y*rightMult);
+        if(rightBum && leftBum) move(-leftst*0.3, -rightst*0.3);
+        else if(vibrate) {
+            vibe();
+        }
+        else move(-leftst*leftMult, -rightst*rightMult);
+
     }
 
+    private void vibe(){
+        if(vibcount>=0) {
+            vibcount++;
+            move(0.6,0.6);
+        }
+        else if(vibcount<=0) {
+            vibcount--;
+            move(-0.7,-0.7);
+        }
+        if(vibcount==1) vibcount=-1;
+        if(vibcount==-2) vibcount=0;
+    }
     private void tankDrive2() {
         double leftJoy = -gamepad1.left_stick_y;
         double rightJoy = -gamepad1.right_stick_y;
@@ -192,7 +213,7 @@ public class FirstOpMode extends LinearOpMode {
             orb=false;
         }
         if(orbt){
-            lift.setPower(1);
+            lift.setPower(0.7);
             collector.setPower(0.8);
         }
         else{
@@ -214,10 +235,10 @@ public class FirstOpMode extends LinearOpMode {
             sort = false;
             for (int j = 0; j < 3; j++) sorter[j].setPosition(endp[j][3]);
         }
-        telemetry.addData("sort",sort);
+        //telemetry.addData("sort",sort);
 
-        telemetry.addData("lift",lift.getCurrentPosition()-lastpos);
-        lastpos=lift.getCurrentPosition();
+        //telemetry.addData("lift",lift.getCurrentPosition()-lastpos);
+        //lastpos=lift.getCurrentPosition();
     }
     private void accelDrive() {
         accer = -gamepad1.right_stick_y;
@@ -346,9 +367,9 @@ public class FirstOpMode extends LinearOpMode {
     private void scale3(){
         int lenc=climbleft.getCurrentPosition();
         int renc=climbright.getCurrentPosition();
-
-        if(gamepad2.left_stick_y != 0){
-            climbright.setPower(-gamepad2.left_stick_y);
+        double leftstick = gamepad2.left_stick_y;
+        if(leftstick != 0){
+            climbright.setPower(-leftstick);
         }else if(gamepad2.right_bumper && renc < 620){
             climbright.setPower(0.5);
         }else if(gamepad2.right_trigger > 0 && renc > 0){
@@ -356,8 +377,8 @@ public class FirstOpMode extends LinearOpMode {
         }else{
             climbright.setPower(0);
         }
-        if(gamepad2.left_stick_y != 0){
-            climbleft.setPower(-gamepad2.left_stick_y);
+        if(leftstick != 0){
+            climbleft.setPower(-leftstick);
         }else if(gamepad2.left_bumper && lenc <620){
             climbleft.setPower(0.5);
         }else if(gamepad2.left_trigger > 0 && lenc > 0){
@@ -422,7 +443,7 @@ public class FirstOpMode extends LinearOpMode {
                 errorr = 0;
             }
             if (lastr) {
-                telemetry.addData("lastrt","yes");
+                //telemetry.addData("lastrt","yes");
                 errorl = 620-climbleft.getCurrentPosition();
                 errorr = 620-climbright.getCurrentPosition();
             }
@@ -437,14 +458,15 @@ public class FirstOpMode extends LinearOpMode {
         if (gamepad2.a) {
             deliver.setPosition(0.38);
         } else if (gamepad2.b) {
-            deliver.setPosition(0.68);
+            deliver.setPosition(0.72);
         } else {
             deliver.setPosition(0.53);
         }
 //        deliver.setPosition(0.5 + Math.signum(des - cur) * 0.2);
-//        cur += Math.signum(des - cur) * 1;
+//        cur += Math.e4signum(des - cur) * 1;
 //        lastb = gamepad2.b;
-//        if(des-cur==0)        //            deliver.setPosition(gamepad2.right_stick_x*0.5 + 0.5);
+//        if(des-cur==0){
+//            deliver.setPosition(gamepad2.right_stick_x*0.5 + 0.5);
 //            //if(gamepad2.right_stick_y>0.5) deliver.setPosition(0.3);
 //            //else if(gamepad2.right_stick_y<-0.5) deliver.setPosition(0.7);
 //        }
@@ -473,7 +495,7 @@ public class FirstOpMode extends LinearOpMode {
         sorting(0);sorting(1);sorting(2);
     }
     private void telemetry(){
-        telemetry.update();
+        //telemetry.update();
 
     }
     private void resetComponents(){
@@ -485,37 +507,38 @@ public class FirstOpMode extends LinearOpMode {
         lift.setPower(0);
         for(int i = 0; i < 3; i++) sorter[i].setPosition(endp[i][1]);
     }
-    //
     private void sorting(int col){
-        if (!orange[col] && prox[col].getDistance(DistanceUnit.CM) < 6 && color[col].blue() < color[col].red()) {
+        boolean distance = prox[col].getDistance(DistanceUnit.CM) < 6;
+        boolean isRed = color[col].blue() < color[col].red();
+        if (!orange[col] && distance && isRed) {
             orange[col] = true;
-            lastNotDetected[col] = System.currentTimeMillis();
-            queue[col].add(new Action(800 + System.currentTimeMillis(), -1));
-        } else if (!blue[col] && prox[col].getDistance(DistanceUnit.CM) < 6 && (color[col].blue() > color[col].red())){
+
+        } else if (!blue[col] && distance && !isRed){
             blue[col] = true;
-            lastNotDetected[col] = System.currentTimeMillis();
-            queue[col].add(new Action(800 + System.currentTimeMillis(), 1));
         }
-        if (orange[col] && (prox[col].getDistance(DistanceUnit.CM) > 6 || System.currentTimeMillis() - lastNotDetected[col] > balldelay)) {
+        if (orange[col] && !distance) {
             orange[col] = false;
-
+            lastNotDetected[col] = System.currentTimeMillis();
+            queue[col].add(new Action(270 + System.currentTimeMillis(), -1));
         }
-        else if (blue[col] && (prox[col].getDistance(DistanceUnit.CM) > 6 || System.currentTimeMillis() - lastNotDetected[col] > balldelay)) {
+        else if (blue[col] && !distance) {
             blue[col] = false;
-
+            lastNotDetected[col] = System.currentTimeMillis();
+            queue[col].add(new Action(270 + System.currentTimeMillis(), 1));
         }
         if(!queue[col].isEmpty() && System.currentTimeMillis() > queue[col].peek().time) {
             int state = queue[col].peek().action;
             queue[col].poll();
             if (state == 1) {
                 sorter[col].setPosition(endp[col][0]);
-                if (queue[col].isEmpty()) queue[col].add(new Action(440 + System.currentTimeMillis(), 0));
+                //if (queue[col].isEmpty()) queue[col].add(new Action(440 + System.currentTimeMillis(), 0));
             }
             else if (state == -1) {
                 sorter[col].setPosition(endp[col][2]);
-                if (queue[col].isEmpty()) queue[col].add(new Action(440 + System.currentTimeMillis(), 0));
+                //if (queue[col].isEmpty()) queue[col].add(new Action(440 + System.currentTimeMillis(), 0));
             }
             else if(state==0) sorter[col].setPosition(endp[col][1]);
+
         }
     }
     private boolean waitForTick(long periodMs){
